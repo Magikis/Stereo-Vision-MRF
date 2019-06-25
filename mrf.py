@@ -47,13 +47,16 @@ class MRFStereo():
         self.mrf[:, :, Direction.data.value, :] = (
             (
                 self.mrf[:, :, Direction.data.value, :]
-                - self.mrf[:, :, Direction.data.value, :].min(axis=-1)[...,np.newaxis]
+                - self.mrf[:, :, Direction.data.value,
+                           :].min(axis=-1)[..., np.newaxis]
             )
             / (
                 self.mrf[:, :, Direction.data.value, :].max(axis=-1)
                 - self.mrf[:, :, Direction.data.value, :].min(axis=-1)
-            )[...,np.newaxis]
+            )[..., np.newaxis]
         )
+        self.mrf = (self.mrf * 100).astype(int)
+
         self.map()
 
     def _smoothness_cost(self, LAMBDA=20, SMOOTHNESS_TRUNC=2, squared=False):
@@ -98,9 +101,9 @@ class MRFStereo():
         width = self.mrf.shape[1]
 
         p = self.smoothness_cost.copy()
-        p += np.tile(
-            np.sum(self.mrf[y, x, :, :], axis=-2) -
-            self.mrf[y, x, direction.value, :], (self.LABELS, 1)
+        p += (
+            np.sum(self.mrf[y, x, :, :], axis=-2)
+            - self.mrf[y, x, direction.value, :],
         )
         new_msg = np.min(p, axis=1)
 
