@@ -13,12 +13,7 @@ class Direction(Enum):
 
 
 class MRFStereo():
-    def __init__(self, left_image, right_image, LABELS=16, init='ours'):
-        self.left_image = left_image
-        self.right_image = right_image
-        self.mrf = np.zeros(
-            (*left_image.shape, 5, LABELS), dtype="int64"
-        )
+    def __init__(self, smoothness_args, LABELS=16, init='ours'):
         self.size_of_labels = None
         self.LABELS = LABELS
         self.smoothness_cost = self._smoothness_cost(
@@ -27,53 +22,39 @@ class MRFStereo():
         )
 
         border = LABELS + 2
-        if init == 'ours':
-            for y in range(border, self.mrf.shape[0] - border):
-                for x in range(border, self.mrf.shape[1] - border):
-                    for l in range(LABELS):
-                        self.mrf[y, x, Direction.data.value,
-                                 l] = self.data_cost_stereo(x, y, l)
-
-        if init == 'cv':
-            stereo = cv2.StereoBM_create(16, 5)
-            disparity = stereo.compute(left_image, right_image)
-            disparity = (((disparity + 16) / (disparity + 16).max())
-                         * 15).astype(np.int)
-            for y in range(border, self.mrf.shape[0] - border):
-                for x in range(border, self.mrf.shape[1] - border):
-                    # for l in range(LABELS):
-                    self.mrf[y, x, Direction.data.value] = \
-                        self.smoothness_cost[disparity[y, x], :].copy(
-                    )
-        self.smoothness_cost = self._smoothness_cost(
-            LAMBDA=100,
-            SMOOTHNESS_TRUNC=3,
-            squared=True
+        loaded_picture = np.load(
+            'img_smaller_pbb_25_06-13:56.npy').astype(float)
+        # print(loaded_picture)
+        # _max = loaded_picture.max()
+        # _max[ _max = np.inf] =
+        # loaded_picture = (loaded_picture - loaded_picture.min()) / (_max - loaded_picture.min())
+        # print(loaded_picture)
+        self.mrf = np.zeros(
+            (*loaded_picture.shape[:2], 5, LABELS),
         )
-        
+        self.mrf[:, :, Direction.data.value, :] = loaded_picture
+        # self.mrf = self.mrf * (1 / self.mrf.sum(axis=-1)[..., np.newaxis])
+
+        self.smoothness_cost = self._smoothness_cost(
+            **smoothness_args
+        )
+
         self.mrf = self.mrf[
             border: self.mrf.shape[0] - border,
             border: self.mrf.shape[1] - border
         ]
+
+        self.mrf[:, :, Direction.data.value, :] = (
+            (
+                self.mrf[:, :, Direction.data.value, :]
+                - self.mrf[:, :, Direction.data.value, :].min(axis=-1)[...,np.newaxis]
+            )
+            / (
+                self.mrf[:, :, Direction.data.value, :].max(axis=-1)
+                - self.mrf[:, :, Direction.data.value, :].min(axis=-1)
+            )[...,np.newaxis]
+        )
         self.map()
-
-    def data_cost_stereo(self, x, y, label):
-        r = 2
-        low_y = y - r
-        high_y = y + r + 1
-        low_x = x - r
-        high_x = x + r + 1
-        assert(low_x - label >= 0)
-        # if low_x - label < 0:
-        #     return 0
-
-        left = self.left_image[low_y: high_y, low_x:high_x]
-        right = self.right_image[low_y:high_y, low_x - label: high_x - label]
-
-        if left.shape != right.shape:
-            print(y, x, left.shape, right.shape)
-            assert(0)
-        return np.abs(left - right).mean()
 
     def _smoothness_cost(self, LAMBDA=20, SMOOTHNESS_TRUNC=2, squared=False):
         i = np.array(
