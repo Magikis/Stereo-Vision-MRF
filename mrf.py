@@ -144,8 +144,10 @@ class MRFStereo():
             self.believe_propagation(Direction.up)
             self.believe_propagation(Direction.down)
             energy = self.map()
-            print(f"iteration {(i+1)} / {BP_ITERATIONS}, energy = {energy}")
-
+            if verbose:
+                print(f"iteration {(i+1)} / {BP_ITERATIONS}, energy = {energy}")
+            else:
+                print('.', end='')
             if verbose:
                 self.show()
         return self.show()
